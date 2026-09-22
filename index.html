@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEON GRID GP — Split-Screen Racing</title>
+<style>
+  :root{
+    --p1:#22e6ff; --p2:#ff3df0; --gold:#ffd76a;
+    --hud-font:'Segoe UI',system-ui,-apple-system,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#05010d;font-family:var(--hud-font)}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+
+  /* center divider */
+  #divider{position:fixed;left:50%;top:0;width:3px;height:100%;transform:translateX(-50%);
+    background:linear-gradient(180deg,transparent,var(--p1) 30%,var(--p2) 70%,transparent);
+    opacity:.5;pointer-events:none;z-index:5;filter:blur(.4px)}
+
+  .hud{position:fixed;bottom:22px;z-index:6;pointer-events:none;color:#eaf6ff;
+    text-shadow:0 0 8px rgba(0,0,0,.8);user-select:none}
+  .hud.left{left:26px;text-align:left}
+  .hud.right{right:26px;text-align:right}
+
+  .pos{font-size:44px;font-weight:800;line-height:.9;letter-spacing:1px}
+  .pos small{font-size:18px;font-weight:600;opacity:.7}
+  .p1 .pos{color:var(--p1);text-shadow:0 0 18px rgba(34,230,255,.8)}
+  .p2 .pos{color:var(--p2);text-shadow:0 0 18px rgba(255,61,240,.8)}
+
+  .speed{font-size:30px;font-weight:700;margin-top:4px;letter-spacing:1px}
+  .speed small{font-size:13px;opacity:.65;font-weight:500}
+  .lap{font-size:15px;font-weight:600;opacity:.85;margin-top:3px;letter-spacing:2px}
+  .times{font-size:11px;opacity:.6;margin-top:4px;line-height:1.5;letter-spacing:.5px;font-variant-numeric:tabular-nums}
+
+  .boostwrap{width:190px;height:9px;margin-top:8px;border:1px solid rgba(255,255,255,.35);
+    border-radius:5px;overflow:hidden;background:rgba(0,0,0,.45)}
+  .hud.right .boostwrap{margin-left:auto}
+  .boostfill{height:100%;width:100%;border-radius:4px;transition:width .08s linear}
+  .p1 .boostfill{background:linear-gradient(90deg,#0aa9c2,var(--p1));box-shadow:0 0 10px var(--p1)}
+  .p2 .boostfill{background:linear-gradient(90deg,#c214b5,var(--p2));box-shadow:0 0 10px var(--p2)}
+  .boostlabel{font-size:9px;letter-spacing:3px;opacity:.6;margin-top:3px}
+
+  #minimap{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:6;
+    opacity:.92;pointer-events:none}
+
+  #status{position:fixed;top:26px;left:50%;transform:translateX(-50%);z-index:7;
+    font-size:15px;letter-spacing:4px;color:var(--gold);text-shadow:0 0 14px rgba(255,215,106,.8);
+    font-weight:600;text-transform:uppercase;pointer-events:none;text-align:center}
+
+  .warn{position:fixed;top:38%;z-index:7;font-size:26px;font-weight:800;letter-spacing:4px;
+    color:#ff4b4b;text-shadow:0 0 20px rgba(255,60,60,.9);pointer-events:none;
+    animation:blink .5s steps(2) infinite;display:none}
+  #warn1{left:25%;transform:translateX(-50%)}
+  #warn2{left:75%;transform:translateX(-50%)}
+  @keyframes blink{50%{opacity:.15}}
+
+  #bigno{position:fixed;top:34%;left:50%;transform:translate(-50%,-50%);z-index:8;
+    font-size:120px;font-weight:900;color:#fff;letter-spacing:6px;pointer-events:none;
+    text-shadow:0 0 30px var(--p1),0 0 60px var(--p2);display:none}
+
+  #overlay{position:fixed;inset:0;z-index:9;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;background:rgba(4,0,14,.72);
+    backdrop-filter:blur(3px);transition:opacity .4s}
+  #overlay.hidden{opacity:0;pointer-events:none}
+  #title{font-size:64px;font-weight:900;letter-spacing:10px;color:#fff;
+    text-shadow:0 0 24px var(--p1),0 0 70px var(--p2);margin-bottom:6px}
+  #subtitle{font-size:14px;letter-spacing:8px;color:var(--gold);margin-bottom:44px;
+    text-shadow:0 0 12px rgba(255,215,106,.7)}
+  .cards{display:flex;gap:48px;margin-bottom:44px}
+  .card{border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:20px 30px;
+    min-width:250px;background:rgba(10,4,28,.7);color:#dfeaff}
+  .card h2{font-size:18px;letter-spacing:3px;margin-bottom:14px}
+  .card.p1 h2{color:var(--p1)} .card.p2 h2{color:var(--p2)}
+  .card.p1{border-color:rgba(34,230,255,.45);box-shadow:0 0 24px rgba(34,230,255,.15)}
+  .card.p2{border-color:rgba(255,61,240,.45);box-shadow:0 0 24px rgba(255,61,240,.15)}
+  .keys{font-size:13px;line-height:2.1;opacity:.9}
+  .keys b{display:inline-block;min-width:86px;font-weight:600;opacity:.65}
+  .ready{margin-top:14px;font-size:14px;font-weight:700;letter-spacing:3px;opacity:.55}
+  .ready.on{opacity:1;color:#6aff8a;text-shadow:0 0 12px rgba(106,255,138,.8)}
+  #startmsg{font-size:15px;letter-spacing:5px;color:#fff;opacity:.85;
+    animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  #winner{display:none;flex-direction:column;align-items:center}
+  #winner .wtitle{font-size:58px;font-weight:900;letter-spacing:8px;margin-bottom:10px}
+  #winner .wsub{font-size:16px;letter-spacing:3px;color:#dfeaff;opacity:.8;margin-bottom:30px}
+  #winner .whint{font-size:13px;letter-spacing:4px;color:var(--gold);animation:pulse 1.4s infinite}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="divider"></div>
+
+<div class="hud left p1">
+  <div class="pos" id="pos1">1<small>st</small></div>
+  <div class="speed"><span id="spd1">0</span> <small>km/h</small></div>
+  <div class="lap" id="lap1">LAP 1/3</div>
+  <div class="boostwrap"><div class="boostfill" id="boost1"></div></div>
+  <div class="boostlabel">BOOST — SHIFT</div>
+  <div class="times" id="times1"></div>
+</div>
+
+<div class="hud right p2">
+  <div class="pos" id="pos2">2<small>nd</small></div>
+  <div class="speed"><span id="spd2">0</span> <small>km/h</small></div>
+  <div class="lap" id="lap2">LAP 1/3</div>
+  <div class="boostwrap"><div class="boostfill" id="boost2"></div></div>
+  <div class="boostlabel">BOOST — ENTER</div>
+  <div class="times" id="times2"></div>
+</div>
+
+<canvas id="minimap" width="240" height="170"></canvas>
+<div id="status"></div>
+<div class="warn" id="warn1">WRONG WAY</div>
+<div class="warn" id="warn2">WRONG WAY</div>
+<div id="bigno"></div>
+
+<div id="overlay">
+  <div id="title">NEON GRID GP</div>
+  <div id="subtitle">SPLIT-SCREEN HOVER RACING</div>
+  <div class="cards">
+    <div class="card p1">
+      <h2>PLAYER 1</h2>
+      <div class="keys">
+        <b>THROTTLE</b> W<br>
+        <b>BRAKE / REV</b> S<br>
+        <b>STEER</b> A / D<br>
+        <b>BOOST</b> LEFT SHIFT
+      </div>
+      <div class="ready" id="ready1">PRESS W TO READY</div>
+    </div>
+    <div class="card p2">
+      <h2>PLAYER 2</h2>
+      <div class="keys">
+        <b>THROTTLE</b> ↑<br>
+        <b>BRAKE / REV</b> ↓<br>
+        <b>STEER</b> ← / →<br>
+        <b>BOOST</b> ENTER
+      </div>
+      <div class="ready" id="ready2">PRESS ↑ TO READY</div>
+    </div>
+  </div>
+  <div id="startmsg">FIRST TO 3 LAPS WINS</div>
+  <div id="winner">
+    <div class="wtitle" id="wtitle">P1 WINS</div>
+    <div class="wsub" id="wsub"></div>
+    <div class="whint">PRESS R TO RACE AGAIN</div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
