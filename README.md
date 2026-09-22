@@ -9,6 +9,8 @@ full race loop (countdown → checkpoints → laps → podium).
 ![Players](https://img.shields.io/badge/players-2%20local-ff3df0)
 ![Engine](https://img.shields.io/badge/engine-three.js%200.160-8a5bff)
 
+![Split-screen race](docs/screenshot.png)
+
 ## Quick start
 
 No build step, no install — it's plain ES modules with vendored Three.js:
